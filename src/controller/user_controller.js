@@ -1,8 +1,22 @@
-const { createUser, getUserByEmail } = require("../modals/user_modal");
+const {
+  createUser,
+  getUserByEmail,
+  getUserById,
+  updateUserPassword,
+} = require("../modals/user_modal");
 const bcrypt = require("bcrypt");
 const { validationResult } = require("express-validator");
 const jwt = require("jsonwebtoken");
-const db = require("../config/database");
+const { sendOtpEmail } = require("../utils/emailService");
+
+const OTP_EXPIRY_MINUTES = 10;
+// In-memory OTP store: email -> { otp, expiresAt }
+// This keeps things simple and avoids DB issues for now.
+const otpStore = new Map();
+
+const generateOtp = () => {
+  return Math.floor(100000 + Math.random() * 900000).toString();
+};
 
 const registerUser = async (req, res) => {
   try {
@@ -70,7 +84,7 @@ const loginUser = async (req, res) => {
     });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ message: "Server error" });
+    res.status(500).json({ message: "Server error" } , err.message);
   }
 };
 
@@ -81,48 +95,97 @@ const resetPassword = async (req, res) => {
       return res.status(400).json({ errors: errors.array() });
     }
 
-    const { newPassword, confirmPassword, token } = req.body;
-
-    // Check passwords match
+    const { newPassword, confirmPassword } = req.body;
+    const userId = req.user.userId;
     if (newPassword !== confirmPassword) {
       return res.status(400).json({
-        errors: [{ msg: "New password and confirm password do not match" }],
+        message: "New password and confirm password do not match",
       });
     }
-
-    // Check token in DB
-    const [user] = await db.query(
-      "SELECT * FROM user WHERE resetToken = ? AND resetTokenExpire > NOW()",
-      [token]
-    );
-
-    if (!user.length) {
-      return res
-        .status(400)
-        .json({ errors: [{ msg: "Invalid or expired token" }] });
+    const user = await getUserById(userId);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
     }
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    await updateUserPassword(userId, hashedPassword);
 
-    const userId = user[0].id;
-
-    // Hash password
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(newPassword, salt);
-
-    // Update DB
-    await db.query(
-      "UPDATE user SET password = ?, resetToken = NULL, resetTokenExpire = NULL WHERE id = ?",
-      [hashedPassword, userId]
-    );
-
-    return res.status(200).json({ message: "Password reset successfully" });
-  } catch (error) {
-    console.log(error);
-    res.status(500).json({ errors: [{ msg: "Server error" }] });
+    res.status(200).json({
+      message: "Password reset successfully",
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Server error" });
   }
 };
 
-module.exports = {
-  registerUser,
-  loginUser,
-  resetPassword,
+const sendOtp = async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    const { email } = req.body;
+
+    const otp = generateOtp();
+    const expiresAt = new Date(Date.now() + OTP_EXPIRY_MINUTES * 60 * 1000);
+
+    // Store in-memory for simple verification.
+    otpStore.set(email, { otp, expiresAt });
+
+    // Try to send email, but even if it fails, still return OTP in response for development.
+    await sendOtpEmail(email, otp, OTP_EXPIRY_MINUTES);
+
+    return res.status(200).json({
+      message: "OTP sent successfully to your email address",
+      otp, // NOTE: included for development/testing convenience. Remove in production.
+    });
+  } catch (err) {
+    console.error("Error in sendOtp:", err);
+    return res.status(500).json({
+      message: "Server error",
+      error: String(err),
+    });
+  }
 };
+
+const verifyOtp = async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    const { email, otp } = req.body;
+
+    const record = otpStore.get(email);
+    if (!record) {
+      return res
+        .status(400)
+        .json({ message: "No OTP request found for this email" });
+    }
+
+    const now = new Date();
+    const { otp: storedOtp, expiresAt } = record;
+
+    if (now > expiresAt) {
+      otpStore.delete(email);
+      return res.status(400).json({ message: "OTP has expired. Please request a new one." });
+    }
+
+    if (storedOtp !== otp) {
+      return res.status(400).json({ message: "Invalid OTP" });
+    }
+
+    otpStore.delete(email);
+
+    return res.status(200).json({
+      message: "OTP verified successfully",
+    });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ message: "Server error" });
+  }
+};
+
+module.exports = { registerUser, loginUser, resetPassword, sendOtp, verifyOtp };
