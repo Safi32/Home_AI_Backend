@@ -24,7 +24,6 @@ const setResetToken = async (userId, token, expiresAt) => {
     );
 };
 
-// Use the existing resetToken / resetTokenExpire columns to store OTP metadata by email.
 const updateUserOtp = async (email, otpCode, expiresAt) => {
     await db.query(
         "UPDATE user SET resetToken = ?, resetTokenExpire = ? WHERE email = ?",
@@ -46,6 +45,53 @@ const createUser = async (user) => {
     return result;
 };
 
+const updateUserProfile = async (userId, updateData) => {
+    const { username, email, profilePicture } = updateData;
+    const updates = [];
+    const params = [];
+
+    if (username) {
+        updates.push('username = ?');
+        params.push(username);
+    }
+
+    if (email) {
+        const existingUser = await getUserByEmail(email);
+        if (existingUser && existingUser.id !== userId) {
+            throw new Error('Email already in use');
+        }
+        updates.push('email = ?');
+        params.push(email);
+    }
+
+    if (profilePicture) {
+        updates.push('profile_picture = ?');
+        params.push(profilePicture);
+    }
+
+    if (updates.length === 0) {
+        throw new Error('No valid fields to update');
+    }
+
+    const query = `UPDATE user SET ${updates.join(', ')} WHERE id = ?`;
+    params.push(userId);
+
+    await db.query(query, params);
+
+    // Return the complete updated user
+    const [updatedUser] = await db.query(`
+        SELECT id, username, email, profile_picture, created_at 
+        FROM user 
+        WHERE id = ?
+    `, [userId]);
+
+    if (!updatedUser || updatedUser.length === 0) {
+        throw new Error('User not found after update');
+    }
+
+    return updatedUser[0];
+};
+
 module.exports = {
     getUserByEmail,
     getUserById,
@@ -54,4 +100,5 @@ module.exports = {
     updateUserPassword,
     updateUserOtp,
     clearUserOtp,
+    updateUserProfile
 };

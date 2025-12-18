@@ -1,8 +1,9 @@
 const express = require("express");
 const router = express.Router();
-const { registerUser, loginUser, resetPassword, sendOtp, verifyOtp } = require("../controller/user_controller");
+const { registerUser, loginUser, resetPassword, sendOtp, verifyOtp, updateProfile } = require("../controller/user_controller");
 const { body } = require("express-validator");
 const authenticate = require("../middleware/middleware");
+const upload = require('../middleware/upload');
 
 router.post(
   "/register",
@@ -43,8 +44,6 @@ router.post(
   ],
   verifyOtp
 );
-
-// Reset Password Route (Protected)
 router.post(
   "/reset-password",
   authenticate,
@@ -57,6 +56,17 @@ router.post(
       .withMessage("Confirm password is required"),
   ],
   resetPassword
+);
+router.put(
+  '/profile',
+  authenticate,
+  upload.single('profilePicture'),
+  [
+    body('username').optional().trim().notEmpty(),
+    body('email').optional().isEmail(),
+    body('password').optional().isLength({ min: 6 })
+  ],
+  updateProfile
 );
 
 module.exports = router;
