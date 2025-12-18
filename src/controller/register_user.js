@@ -24,25 +24,25 @@ const registerUser = async (req, res) => {
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
-
-    const result = await createUser({
-      username,
-      email,
-      password: hashedPassword,
-      is_email_verified: false
-    });
-
-
-    const otp = generateOtp().toString();  // Convert to string when generating
+    const otp = generateOtp().toString();
     const expiresAt = new Date(Date.now() + OTP_EXPIRY_MINUTES * 60 * 1000);
-    otpStore.set(email, { otp, expiresAt });  // Store as string
+
+    // Store user data and OTP in memory
+    otpStore.set(email, {
+      otp,
+      expiresAt,
+      userData: {
+        username,
+        email,
+        password: hashedPassword
+      }
+    });
 
     await sendOtpEmail(email, otp, OTP_EXPIRY_MINUTES);
 
     return res.status(201).json({
       success: true,
-      message: "Registration successful. OTP sent to your email for verification.",
-      userId: result.insertId
+      message: "Registration successful. OTP sent to your email for verification."
     });
 
   } catch (err) {

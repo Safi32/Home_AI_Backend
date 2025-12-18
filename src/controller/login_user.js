@@ -22,6 +22,14 @@ const loginUser = async (req, res) => {
       return res.status(400).json({ message: "Invalid email or password" });
     }
 
+    // Check if email is verified
+    if (!user.is_email_verified) {
+      return res.status(403).json({
+        message: "Please verify your email address before logging in. Check your email for the verification OTP.",
+        requiresVerification: true
+      });
+    }
+
     const token = jwt.sign(
       { userId: user.id, email: user.email },
       process.env.JWT_SECRET,

@@ -1,5 +1,5 @@
 const { validationResult } = require("express-validator");
-const { getUserByEmail, verifyUserEmail } = require("../modals/user_modal");
+const { getUserByEmail, verifyUserEmail, createUser } = require("../modals/user_modal");
 const { otpStore } = require("../utils/otp_store");
 
 const verifyOtp = async (req, res) => {
@@ -20,7 +20,7 @@ const verifyOtp = async (req, res) => {
       });
     }
 
-    const { otp: storedOtp, expiresAt } = record;
+    const { otp: storedOtp, expiresAt, userData } = record;
 
     if (new Date() > expiresAt) {
       otpStore.delete(email);
@@ -36,10 +36,11 @@ const verifyOtp = async (req, res) => {
     }
 
     try {
-      // Verify the user's email using the dedicated function
+      // Create the user in the database and verify email
+      const result = await createUser(userData);
       await verifyUserEmail(email);
       
-      // Clear the OTP after successful verification
+      // Clear the OTP after successful verification and user creation
       otpStore.delete(email);
 
       return res.status(200).json({ 
