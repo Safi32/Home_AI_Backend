@@ -9,46 +9,45 @@ const nodemailer = require("nodemailer");
 const transporter = nodemailer.createTransport({
   service: "gmail",
   auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS,
+    user: process.env.SMTP_USER || process.env.EMAIL_USER,
+    pass: process.env.SMTP_PASS || process.env.EMAIL_PASS,
   },
 });
 
 const fromAddress = `${process.env.SMTP_FROM_NAME || "HomeAI"} <${
-  process.env.SMTP_USER
+  process.env.SMTP_USER || process.env.EMAIL_USER
 }>`;
 
 /**
- * Send a one-time password (OTP) email to the user.
- * @param {string} to Recipient email address.
- * @param {string} otp The OTP code to send.
- * @param {number} expiresInMinutes Expiry time in minutes.
+ * Sends an OTP email to the specified email address
+ * @param {string} to - Recipient email address
+ * @param {string} otp - The OTP to send
+ * @param {number} expiryMinutes - Number of minutes until the OTP expires
  */
-const sendOtpEmail = async (to, otp, expiresInMinutes = 10) => {
+const sendOtpEmail = async (to, otp, expiryMinutes) => {
   const mailOptions = {
     from: fromAddress,
     to,
-    subject: "Your One-Time Password (OTP)",
+    subject: 'Your OTP for HomeAI',
     html: `
-      <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 24px; border: 1px solid #e5e7eb; border-radius: 8px;">
-        <h2 style="margin-top: 0; color: #111827;">HomeAI Verification Code</h2>
-        <p style="color: #374151;">Use the following one-time password (OTP) to complete your verification:</p>
-        <p style="font-size: 28px; letter-spacing: 8px; font-weight: bold; color: #111827; text-align: center; margin: 24px 0;">${otp}</p>
-        <p style="color: #374151;">This code will expire in <strong>${expiresInMinutes} minutes</strong>. For your security, do not share this code with anyone.</p>
-        <p style="color: #9ca3af; font-size: 12px; margin-top: 24px;">If you did not request this code, you can safely ignore this email.</p>
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 5px;">
+        <h2 style="color: #4a90e2;">Your One-Time Password (OTP)</h2>
+        <p>Your OTP for verification is: <strong>${otp}</strong></p>
+        <p>This OTP will expire in ${expiryMinutes} minutes.</p>
+        <p>If you didn't request this OTP, please ignore this email.</p>
+        <hr style="border: none; border-top: 1px solid #e0e0e0; margin: 20px 0;">
+        <p style="color: #666; font-size: 12px;">This is an automated message, please do not reply to this email.</p>
       </div>
-    `,
+    `
   };
 
   try {
-    console.log("Attempting to send email to:", to);
-    const info = await transporter.sendMail(mailOptions);
-    console.log("Email sent successfully:", info.messageId);
-    return info;
-  } catch (err) {
-    // Log but do NOT throw, so API can still respond with OTP for debugging.
-    console.error("Failed to send OTP email:", err.message);
-    return null;
+    await transporter.sendMail(mailOptions);
+    console.log(`OTP email sent to ${to}`);
+    return true;
+  } catch (error) {
+    console.error('Error sending OTP email:', error);
+    throw new Error('Failed to send OTP email');
   }
 };
 

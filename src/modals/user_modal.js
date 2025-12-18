@@ -1,9 +1,18 @@
 const db = require('../config/database');
 
 const getUserByEmail = async (email) => {
-    const [rows] = await db.query("SELECT * FROM user WHERE email = ?", [email]);
+    const [rows] = await db.query(
+        "SELECT * FROM user WHERE email = ?",
+        [email]
+    );
     return rows[0];
 };
+
+
+// const getUserByEmail = async (email) => {
+//     const [rows] = await db.query("SELECT * FROM user WHERE email = ?", [email]);
+//     return rows[0];
+// };
 
 const getUserById = async (userId) => {
     const [rows] = await db.query("SELECT * FROM user WHERE id = ?", [userId]);
@@ -40,13 +49,24 @@ const clearUserOtp = async (email) => {
 
 const createUser = async (user) => {
     const { username, email, password } = user;
-    const sql = "INSERT INTO user (username, email, password) VALUES (?, ?, ?)";
+    const sql = `
+        INSERT INTO user (username, email, password, is_email_verified)
+        VALUES (?, ?, ?, false)
+    `;
     const [result] = await db.query(sql, [username, email, password]);
     return result;
 };
 
+
+// const createUser = async (user) => {
+//     const { username, email, password } = user;
+//     const sql = "INSERT INTO user (username, email, password) VALUES (?, ?, ?)";
+//     const [result] = await db.query(sql, [username, email, password]);
+//     return result;
+// };
+
 const updateUserProfile = async (userId, updateData) => {
-    const { username, email, profilePicture } = updateData;
+    const { username, email, profile_picture } = updateData;
     const updates = [];
     const params = [];
 
@@ -64,13 +84,9 @@ const updateUserProfile = async (userId, updateData) => {
         params.push(email);
     }
 
-    if (profilePicture) {
+    if (profile_picture) {
         updates.push('profile_picture = ?');
-        params.push(profilePicture);
-    }
-
-    if (updates.length === 0) {
-        throw new Error('No valid fields to update');
+        params.push(profile_picture);
     }
 
     const query = `UPDATE user SET ${updates.join(', ')} WHERE id = ?`;
@@ -92,6 +108,14 @@ const updateUserProfile = async (userId, updateData) => {
     return updatedUser[0];
 };
 
+const verifyUserEmail = async (email) => {
+    await db.query(
+        "UPDATE user SET is_email_verified = true WHERE email = ?",
+        [email]
+    );
+};
+
+
 module.exports = {
     getUserByEmail,
     getUserById,
@@ -100,5 +124,6 @@ module.exports = {
     updateUserPassword,
     updateUserOtp,
     clearUserOtp,
-    updateUserProfile
+    updateUserProfile,
+    verifyUserEmail
 };

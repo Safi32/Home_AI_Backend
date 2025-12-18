@@ -1,0 +1,56 @@
+const { getUserByEmail, createUser } = require("../modals/user_modal");
+const { validationResult } = require("express-validator");
+const bcrypt = require("bcrypt");
+const { otpStore, OTP_EXPIRY_MINUTES } = require("../utils/otp_store");
+const { sendOtpEmail } = require("../utils/emailService");
+
+// Generate a random 4-digit OTP
+const generateOtp = () => {
+  return Math.floor(1000 + Math.random() * 9000).toString();
+};
+
+const registerUser = async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    const { username, email, password } = req.body;
+
+    const existingUser = await getUserByEmail(email);
+    if (existingUser) {
+      return res.status(400).json({ message: "Email already registered" });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    const result = await createUser({
+      username,
+      email,
+      password: hashedPassword,
+      is_email_verified: false
+    });
+
+
+    const otp = generateOtp().toString();  // Convert to string when generating
+    const expiresAt = new Date(Date.now() + OTP_EXPIRY_MINUTES * 60 * 1000);
+    otpStore.set(email, { otp, expiresAt });  // Store as string
+
+    await sendOtpEmail(email, otp, OTP_EXPIRY_MINUTES);
+
+    return res.status(201).json({
+      success: true,
+      message: "Registration successful. OTP sent to your email for verification.",
+      userId: result.insertId
+    });
+
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ message: "Server error" });
+  }
+};
+
+module.exports = {
+  registerUser
+};

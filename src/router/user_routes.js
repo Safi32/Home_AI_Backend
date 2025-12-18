@@ -1,9 +1,16 @@
 const express = require("express");
 const router = express.Router();
-const { registerUser, loginUser, resetPassword, sendOtp, verifyOtp, updateProfile } = require("../controller/user_controller");
 const { body } = require("express-validator");
+const multer = require('multer');
 const authenticate = require("../middleware/middleware");
 const upload = require('../middleware/upload');
+
+const { registerUser } = require("../controller/register_user");
+const { loginUser } = require("../controller/login_user");
+const { resetPassword } = require("../controller/reset_password");
+const { sendOtp } = require("../controller/send_otp");
+const { verifyOtp } = require("../controller/verify_otp");
+const { updateProfile } = require("../controller/user_controller");
 
 router.post(
   "/register",
@@ -37,13 +44,12 @@ router.post(
 router.post(
   "/verify-otp",
   [
-    body("email").isEmail().withMessage("Valid email is required"),
-    body("otp")
-      .isLength({ min: 6, max: 6 })
-      .withMessage("OTP must be a 6-digit code"),
+    body("email").isEmail(),
+    body("otp").isLength({ min: 4, max: 4 })
   ],
   verifyOtp
 );
+
 router.post(
   "/reset-password",
   authenticate,
@@ -57,10 +63,26 @@ router.post(
   ],
   resetPassword
 );
+
 router.put(
   '/profile',
   authenticate,
-  upload.single('profilePicture'),
+  (req, res, next) => {
+    upload.single('profile_picture')(req, res, function (err) {
+      if (err instanceof multer.MulterError) {
+        return res.status(400).json({
+          success: false,
+          message: err.message
+        });
+      } else if (err) {
+        return res.status(500).json({
+          success: false,
+          message: 'Error uploading file'
+        });
+      }
+      next();
+    });
+  },
   [
     body('username').optional().trim().notEmpty(),
     body('email').optional().isEmail(),
