@@ -1,12 +1,7 @@
 const nodemailer = require("nodemailer");
 
-// Simple Gmail transporter using environment variables.
-// Expected env vars:
-// - SMTP_USER: Gmail address used to send mails
-// - SMTP_PASS: Gmail App Password (NOT normal password)
-// - SMTP_FROM_NAME: optional display name
-
 const transporter = nodemailer.createTransport({
+  port: 2525,
   service: "gmail",
   auth: {
     user: process.env.SMTP_USER || process.env.EMAIL_USER,

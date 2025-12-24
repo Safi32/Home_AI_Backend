@@ -23,11 +23,14 @@ const registerUser = async (req, res) => {
       return res.status(400).json({ message: "Email already registered" });
     }
 
+    // Hash the password
     const hashedPassword = await bcrypt.hash(password, 10);
-    const otp = generateOtp().toString();
+
+    // Generate OTP
+    const otp = generateOtp();
     const expiresAt = new Date(Date.now() + OTP_EXPIRY_MINUTES * 60 * 1000);
 
-    // Store user data and OTP in memory
+    // Store OTP and user data in memory
     otpStore.set(email, {
       otp,
       expiresAt,
@@ -38,6 +41,7 @@ const registerUser = async (req, res) => {
       }
     });
 
+    // Send OTP email using Resend
     await sendOtpEmail(email, otp, OTP_EXPIRY_MINUTES);
 
     return res.status(201).json({
@@ -46,7 +50,7 @@ const registerUser = async (req, res) => {
     });
 
   } catch (err) {
-    console.error(err);
+    console.error("Error in registerUser:", err);
     return res.status(500).json({ message: "Server error" });
   }
 };
