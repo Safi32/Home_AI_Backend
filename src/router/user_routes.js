@@ -52,8 +52,8 @@ router.post(
 
 router.post(
   "/reset-password",
-  authenticate,
   [
+    body("email").isEmail().withMessage("Valid email is required"),
     body("newPassword")
       .isLength({ min: 6 })
       .withMessage("New password must be at least 6 characters"),
