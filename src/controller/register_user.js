@@ -11,26 +11,32 @@ const generateOtp = () => {
 
 const registerUser = async (req, res) => {
   try {
+    console.log('registerUser function called');
+
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
+      console.log('Validation errors:', errors.array());
       return res.status(400).json({ errors: errors.array() });
     }
 
     const { username, email, password } = req.body;
+    console.log('Extracted data:', { username, email, password: '***' });
 
+    console.log('Checking if user exists...');
     const existingUser = await getUserByEmail(email);
     if (existingUser) {
+      console.log('User already exists');
       return res.status(400).json({ message: "Email already registered" });
     }
 
-    // Hash the password
+    console.log('Hashing password...');
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Generate OTP
+    console.log('Generating OTP...');
     const otp = generateOtp();
     const expiresAt = new Date(Date.now() + OTP_EXPIRY_MINUTES * 60 * 1000);
 
-    // Store OTP and user data in memory
+    console.log('Storing OTP...');
     otpStore.set(email, {
       otp,
       expiresAt,
@@ -41,9 +47,10 @@ const registerUser = async (req, res) => {
       }
     });
 
-    // Send OTP email using Resend
+    console.log('Sending OTP email...');
     await sendOtpEmail(email, otp, OTP_EXPIRY_MINUTES);
 
+    console.log('Registration successful');
     return res.status(201).json({
       success: true,
       message: "Registration successful. OTP sent to your email for verification."
@@ -51,6 +58,7 @@ const registerUser = async (req, res) => {
 
   } catch (err) {
     console.error("Error in registerUser:", err);
+    console.error("Error stack:", err.stack);
     return res.status(500).json({ message: "Server error" });
   }
 };

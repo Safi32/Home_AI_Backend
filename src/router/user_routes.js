@@ -21,7 +21,12 @@ router.post(
       .isLength({ min: 6 })
       .withMessage("Password must be at least 6 characters"),
   ],
-  registerUser
+  (req, res, next) => {
+    console.log('Register route hit!');
+    console.log('Request body:', req.body);
+    console.log('Request headers:', req.headers);
+    registerUser(req, res, next);
+  }
 );
 
 router.post(
