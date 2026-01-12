@@ -158,11 +158,6 @@ async function startServer() {
     const PORT = process.env.PORT || await getAvailablePort(DEFAULT_PORT);
 
     const server = app.listen(PORT, "0.0.0.0", () => {
-      console.log(`✅ Server is running on port ${PORT}`);
-      console.log(`🌐 Local URL: http://localhost:${PORT}`);
-      console.log(`🌍 Network URL: http://0.0.0.0:${PORT}`);
-      console.log(`📊 Health check: http://localhost:${PORT}/health`);
-      console.log(`🔄 API Base URL: http://localhost:${PORT}/api`);
     });
 
     // Handle server errors
