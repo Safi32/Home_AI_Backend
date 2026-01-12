@@ -27,9 +27,35 @@ app.use((req, res, next) => {
 // Serve uploads
 app.use("/uploads", express.static(uploadsDir));
 
-// Health check endpoint for Railway
-app.get("/health", (req, res) => {
-  res.json({ status: "ok" });
+// Health check endpoint
+app.get("/health", async (req, res) => {
+  const healthcheck = {
+    status: 'server is running',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+    database: 'unknown',
+    environment: process.env.NODE_ENV || 'development',
+    nodeVersion: process.version,
+    platform: process.platform,
+    memoryUsage: process.memoryUsage()
+  };
+
+  try {
+    // Check database connection if available
+    if (db) {
+      const [rows] = await db.query('SELECT 1 as db_ok');
+      healthcheck.database = rows && rows[0] && rows[0].db_ok === 1 ? 'connected' : 'disconnected';
+    } else {
+      healthcheck.database = 'not connected';
+    }
+
+    res.status(200).json(healthcheck);
+  } catch (error) {
+    healthcheck.status = 'error';
+    healthcheck.error = error.message;
+    healthcheck.database = 'connection failed';
+    res.status(503).json(healthcheck);
+  }
 });
 
 // Root endpoint
@@ -86,10 +112,10 @@ async function startServer() {
   await connectDB();
   await loadRoutes();
 
-  const PORT = process.env.PORT || 3000;  // Default to 3000 if PORT is not set
+  const PORT = process.env.PORT || 3000;  
   const server = app.listen(PORT, "0.0.0.0", () => {
-    console.log(`🚀 Server is running on port ${PORT}`);
-    console.log(`🌐 Server URL: http://0.0.0.0:${PORT}`);
+    console.log(`Server is running on port ${PORT}`);
+    console.log(`Server URL: http://0.0.0.0:${PORT}`);
   });
 
   // Handle server errors
