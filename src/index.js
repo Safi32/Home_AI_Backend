@@ -1,11 +1,14 @@
 const express = require("express");
-const userRoutes = require("./router/user_routes");
-const imageRoutes = require("./router/imageRoutes");
 const dotenv = require("dotenv");
 const fs = require('fs');
 const path = require('path');
 
+// Load environment variables first
 dotenv.config();
+
+console.log('Environment check:');
+console.log('DB_HOST:', process.env.DB_HOST ? 'SET' : 'MISSING');
+console.log('JWT_SECRET:', process.env.JWT_SECRET ? 'SET' : 'MISSING');
 
 const uploadsDir = path.join(__dirname, '..', 'uploads');
 if (!fs.existsSync(uploadsDir)) {
@@ -20,23 +23,21 @@ app.use(express.json());
 app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
 
 app.get("/", (req, res) => {
-  res.json({
-    message: "API is running!",
-    timestamp: new Date().toISOString(),
-    env: process.env.NODE_ENV || 'development'
-  });
+  res.send("API is running!");
 });
 
-app.get("/health", (req, res) => {
-  res.json({
-    status: "OK",
-    database: process.env.DB_HOST ? "configured" : "missing",
-    jwt: process.env.JWT_SECRET ? "configured" : "missing"
-  });
-});
+// Load routes with error handling
+try {
+  const userRoutes = require("./router/user_routes");
+  const imageRoutes = require("./router/imageRoutes");
 
-app.use("/api/users", userRoutes);
-app.use("/api/images", imageRoutes);
+  app.use("/api/users", userRoutes);
+  app.use("/api/images", imageRoutes);
+  console.log('Routes loaded successfully');
+} catch (error) {
+  console.error('Error loading routes:', error.message);
+  console.error('Full error:', error);
+}
 
 app.use((err, req, res, next) => {
   console.error(err.stack);
