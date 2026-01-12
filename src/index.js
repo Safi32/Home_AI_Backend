@@ -20,7 +20,19 @@ app.use(express.json());
 app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
 
 app.get("/", (req, res) => {
-  res.send("API is running!");
+  res.json({
+    message: "API is running!",
+    timestamp: new Date().toISOString(),
+    env: process.env.NODE_ENV || 'development'
+  });
+});
+
+app.get("/health", (req, res) => {
+  res.json({
+    status: "OK",
+    database: process.env.DB_HOST ? "configured" : "missing",
+    jwt: process.env.JWT_SECRET ? "configured" : "missing"
+  });
 });
 
 app.use("/api/users", userRoutes);
