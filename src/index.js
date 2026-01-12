@@ -26,6 +26,20 @@ app.get("/", (req, res) => {
   res.send("API is running!");
 });
 
+app.get("/test", (req, res) => {
+  res.json({
+    message: "Test endpoint working",
+    timestamp: new Date().toISOString()
+  });
+});
+
+app.post("/test", (req, res) => {
+  res.json({
+    message: "POST test endpoint working",
+    body: req.body
+  });
+});
+
 // Load routes with error handling
 try {
   const userRoutes = require("./router/user_routes");
