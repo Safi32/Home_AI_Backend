@@ -59,7 +59,20 @@ app.get("/health", async (req, res) => {
 });
 
 // Root endpoint
-app.get("/", (req, res) => res.send("API is running!"));
+app.get("/", (req, res) => {
+  res.json({
+    status: 'success',
+    message: 'HomeAI API is running',
+    version: '1.0.0',
+    timestamp: new Date().toISOString(),
+    endpoints: {
+      health: '/health',
+      apiDocs: '/api-docs',
+      users: '/api/users',
+      images: '/api/images'
+    }
+  });
+});
 
 // Database connection
 let db;
