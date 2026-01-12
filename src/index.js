@@ -86,21 +86,21 @@ async function startServer() {
   await connectDB();
   await loadRoutes();
 
-  const PORT = process.env.PORT; // Remove hardcoded fallback
+  const PORT = process.env.PORT || 3000;  // Default to 3000 if PORT is not set
   const server = app.listen(PORT, "0.0.0.0", () => {
     console.log(`🚀 Server is running on port ${PORT}`);
-    console.log(`🌐 Server should be accessible at: http://0.0.0.0:${PORT}`);
+    console.log(`🌐 Server URL: http://0.0.0.0:${PORT}`);
   });
 
   // Handle server errors
-  server.on('error', (err) => {
-    console.error('❌ Server error:', err);
-    if (err.code === 'EADDRINUSE') {
-      console.error(`Port ${PORT} is already in use`);
+  server.on('error', (error) => {
+    if (error.code === 'EADDRINUSE') {
+      console.error(`❌ Port ${PORT} is already in use`);
+    } else {
+      console.error('❌ Server error:', error);
     }
+    process.exit(1);
   });
-
-  return server;
 }
 
 startServer();
