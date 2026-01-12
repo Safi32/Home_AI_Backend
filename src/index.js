@@ -86,7 +86,7 @@ async function startServer() {
   await connectDB();
   await loadRoutes();
 
-  const PORT = process.env.PORT || 8080;
+  const PORT = process.env.PORT; // Remove hardcoded fallback
   const server = app.listen(PORT, "0.0.0.0", () => {
     console.log(`🚀 Server is running on port ${PORT}`);
     console.log(`🌐 Server should be accessible at: http://0.0.0.0:${PORT}`);
