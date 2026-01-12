@@ -2,9 +2,9 @@ const express = require("express");
 const dotenv = require("dotenv");
 const fs = require("fs");
 const path = require("path");
+const mysql = require("mysql2/promise"); // Promise-based MySQL
 const userRoutes = require("./router/user_routes");
 const imageRoutes = require("./router/imageRoutes");
-const mysql = require("mysql2/promise"); // using promise-based mysql for async/await
 
 dotenv.config();
 
@@ -16,8 +16,6 @@ if (!fs.existsSync(uploadsDir)) {
 
 // Create Express app
 const app = express();
-
-// Middleware
 app.use(express.json());
 
 // Request logging
@@ -26,20 +24,18 @@ app.use((req, res, next) => {
   next();
 });
 
-// Serve uploads statically
+// Serve uploads
 app.use("/uploads", express.static(uploadsDir));
 
-// Health check endpoint
+// Health check endpoint for Railway
 app.get("/health", (req, res) => {
   res.json({ status: "ok" });
 });
 
 // Root endpoint
-app.get("/", (req, res) => {
-  res.send("API is running!");
-});
+app.get("/", (req, res) => res.send("API is running!"));
 
-// Database setup
+// Database connection
 let db;
 async function connectDB() {
   try {
@@ -51,16 +47,14 @@ async function connectDB() {
       database: process.env.DB_NAME,
     });
     console.log("✅ Database connected successfully");
-  } catch (error) {
-    console.error("❌ Database connection failed:", error.message);
-    process.exit(1); // exit if DB cannot connect
+    app.locals.db = db; // make DB available in routes
+  } catch (err) {
+    console.error("❌ Database connection failed:", err.message);
+    process.exit(1); // stop the app if DB fails
   }
 }
 
-// Make DB accessible in routes via app.locals
-app.locals.db = db;
-
-// Load routes after DB is connected
+// Load routes
 async function loadRoutes() {
   try {
     console.log("Loading user routes...");
@@ -70,12 +64,12 @@ async function loadRoutes() {
     console.log("Loading image routes...");
     app.use("/api/images", imageRoutes);
     console.log("Image routes loaded successfully");
-  } catch (error) {
-    console.error("Error loading routes:", error);
+  } catch (err) {
+    console.error("Error loading routes:", err);
   }
 }
 
-// Error handling middleware
+// Error handler
 app.use((err, req, res, next) => {
   console.error("🔥 Error handler triggered:", err.stack);
   res.status(500).json({ success: false, message: err.message || "Something went wrong!" });
@@ -87,10 +81,10 @@ app.use((req, res) => {
   res.status(404).json({ message: "Route not found" });
 });
 
-// Start server after DB connection and route loading
+// Start server only after DB connection and routes loaded
 async function startServer() {
-  await connectDB(); // wait for DB
-  await loadRoutes(); // load routes
+  await connectDB();
+  await loadRoutes();
 
   const PORT = process.env.PORT || 8080;
   app.listen(PORT, "0.0.0.0", () => {
