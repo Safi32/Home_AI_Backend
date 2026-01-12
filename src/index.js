@@ -120,26 +120,83 @@ app.use((req, res) => {
   res.status(404).json({ message: "Route not found" });
 });
 
+// Function to find an available port
+const getAvailablePort = async (startPort) => {
+  const net = require('net');
+  const server = net.createServer();
+
+  return new Promise((resolve, reject) => {
+    const tryPort = (port) => {
+      server.once('error', (err) => {
+        if (err.code === 'EADDRINUSE') {
+          console.log(`Port ${port} is in use, trying ${port + 1}...`);
+          tryPort(port + 1);
+        } else {
+          reject(err);
+        }
+      });
+
+      server.once('listening', () => {
+        server.close(() => resolve(port));
+      });
+
+      server.listen(port, '0.0.0.0');
+    };
+
+    tryPort(startPort);
+  });
+};
+
 // Start server only after DB connection and routes loaded
 async function startServer() {
-  await connectDB();
-  await loadRoutes();
+  try {
+    await connectDB();
+    await loadRoutes();
 
-  const PORT = process.env.PORT || 3000;  
-  const server = app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server is running on port ${PORT}`);
-    console.log(`Server URL: http://0.0.0.0:${PORT}`);
-  });
+    // Start with a different default port to avoid conflicts
+    const DEFAULT_PORT = 3001; // Changed from 3000 to 3001
+    const PORT = process.env.PORT || await getAvailablePort(DEFAULT_PORT);
 
-  // Handle server errors
-  server.on('error', (error) => {
-    if (error.code === 'EADDRINUSE') {
-      console.error(`❌ Port ${PORT} is already in use`);
-    } else {
-      console.error('❌ Server error:', error);
+    const server = app.listen(PORT, "0.0.0.0", () => {
+      console.log(`✅ Server is running on port ${PORT}`);
+      console.log(`🌐 Local URL: http://localhost:${PORT}`);
+      console.log(`🌍 Network URL: http://0.0.0.0:${PORT}`);
+      console.log(`📊 Health check: http://localhost:${PORT}/health`);
+      console.log(`🔄 API Base URL: http://localhost:${PORT}/api`);
+    });
+
+    // Handle server errors
+    server.on('error', async (error) => {
+      if (error.code === 'EADDRINUSE') {
+        console.log(`Port ${PORT} is in use, trying next available port...`);
+        // Try again with the next port
+        const newPort = await getAvailablePort(PORT + 1);
+        startServerWithPort(newPort);
+      } else {
+        console.error('❌ Server error:', error);
+        process.exit(1);
+      }
+    });
+
+    // Helper function to start server with specific port
+    function startServerWithPort(port) {
+      const newServer = app.listen(port, "0.0.0.0", () => {
+        console.log(`✅ Server is running on port ${port}`);
+        console.log(`🌐 Local URL: http://localhost:${port}`);
+        console.log(`🌍 Network URL: http://0.0.0.0:${port}`);
+        console.log(`📊 Health check: http://localhost:${port}/health`);
+        console.log(`🔄 API Base URL: http://localhost:${port}/api`);
+      });
+
+      newServer.on('error', (err) => {
+        console.error('❌ Failed to start server:', err);
+        process.exit(1);
+      });
     }
+  } catch (error) {
+    console.error('❌ Failed to start server:', error);
     process.exit(1);
-  });
+  }
 }
 
 startServer();
