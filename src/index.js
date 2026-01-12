@@ -86,10 +86,21 @@ async function startServer() {
   await connectDB();
   await loadRoutes();
 
-  const PORT = process.env.PORT;
-  app.listen(PORT, "0.0.0.0", () => {
+  const PORT = process.env.PORT || 8080;
+  const server = app.listen(PORT, "0.0.0.0", () => {
     console.log(`🚀 Server is running on port ${PORT}`);
+    console.log(`🌐 Server should be accessible at: http://0.0.0.0:${PORT}`);
   });
+
+  // Handle server errors
+  server.on('error', (err) => {
+    console.error('❌ Server error:', err);
+    if (err.code === 'EADDRINUSE') {
+      console.error(`Port ${PORT} is already in use`);
+    }
+  });
+
+  return server;
 }
 
 startServer();
