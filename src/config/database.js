@@ -1,6 +1,19 @@
 const mysql = require('mysql2');
 require('dotenv').config();
 
+console.log('DEBUG: All env vars starting with MYSQL:');
+Object.keys(process.env).forEach(key => {
+  if (key.startsWith('MYSQL')) {
+    console.log(`${key}: ${key.includes('PASSWORD') ? '********' : process.env[key]}`);
+  }
+});
+
+console.log('DEBUG: MYSQLHOST:', process.env.MYSQLHOST);
+console.log('DEBUG: MYSQLUSER:', process.env.MYSQLUSER);
+console.log('DEBUG: MYSQLPASSWORD:', process.env.MYSQLPASSWORD ? '********' : 'undefined');
+console.log('DEBUG: MYSQLDATABASE:', process.env.MYSQLDATABASE);
+console.log('DEBUG: MYSQLPORT:', process.env.MYSQLPORT);
+
 const pool = mysql.createPool({
   host: process.env.MYSQLHOST || process.env.DB_HOST,
   user: process.env.MYSQLUSER || process.env.DB_USER,
