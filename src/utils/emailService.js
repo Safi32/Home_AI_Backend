@@ -32,7 +32,16 @@ const sendOtpEmail = async (to, otp, expiryMinutes) => {
   // Validate from address
   if (!fromAddress || !fromAddress.includes('@')) {
     console.error('❌ Invalid from address:', fromAddress);
+    console.error('❌ RESEND_FROM_EMAIL should be a full email like: noreply@yourdomain.com');
     throw new Error('Invalid sender email configuration');
+  }
+
+  // Additional validation for proper email format
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(fromAddress)) {
+    console.error('❌ Invalid email format:', fromAddress);
+    console.error('❌ Expected format: name@domain.com');
+    throw new Error('Invalid sender email format');
   }
 
   const htmlContent = `
