@@ -1,18 +1,16 @@
 const nodemailer = require("nodemailer");
 
-// Railway-compatible SMTP configuration
 const transporter = nodemailer.createTransport({
-  service: process.env.SMTP_SERVICE || "gmail",
+  port: 2525,
+  service: "gmail",
   auth: {
     user: process.env.SMTP_USER || process.env.EMAIL_USER,
     pass: process.env.SMTP_PASS || process.env.EMAIL_PASS,
   },
-  pool: true, // Use connection pooling
-  maxConnections: 1,
-  maxMessages: 5,
-  rateDelta: 1000, // Rate limiting
-  rateLimit: 5
 });
+
+const fromAddress = `${process.env.SMTP_FROM_NAME || "HomeAI"} <${process.env.SMTP_USER || process.env.EMAIL_USER
+  }>`;
 
 /**
  * Sends an OTP email to the specified email address
