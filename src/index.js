@@ -75,43 +75,41 @@ app.get("/health", async (req, res) => {
       status: 'server is running',
       timestamp: new Date().toISOString(),
       uptime: process.uptime(),
-      database: 'unknown',
+      database: dbConnected ? 'connected' : 'not connected',
       environment: process.env.NODE_ENV || 'development',
       nodeVersion: process.version,
       platform: process.platform,
       memoryUsage: process.memoryUsage()
     };
 
-    try {
-      // Check database connection if available (with timeout)
-      if (db) {
+    // Quick database check if connected (non-blocking)
+    if (db && dbConnected) {
+      try {
         const dbCheckPromise = db.query('SELECT 1 as db_ok');
         const timeoutPromise = new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Database check timeout')), 2000)
+          setTimeout(() => reject(new Error('Database check timeout')), 1000)
         );
         
         try {
           const [rows] = await Promise.race([dbCheckPromise, timeoutPromise]);
           healthcheck.database = rows && rows[0] && rows[0].db_ok === 1 ? 'connected' : 'disconnected';
         } catch (timeoutError) {
-          console.error('Database check timeout:', timeoutError);
           healthcheck.database = 'timeout';
         }
-      } else {
-        healthcheck.database = 'not connected';
+      } catch (dbError) {
+        healthcheck.database = 'connection failed';
+        healthcheck.dbError = dbError.message;
       }
-    } catch (dbError) {
-      console.error('Database check error:', dbError);
-      healthcheck.database = 'connection failed';
-      healthcheck.dbError = dbError.message;
     }
 
+    // Always return 200 - server is running even if DB isn't ready
     res.status(200).json(healthcheck);
   } catch (error) {
     console.error('Error in health check:', error);
-    res.status(500).json({ 
-      status: 'error', 
-      message: 'Health check failed',
+    // Still return 200 - server is running
+    res.status(200).json({ 
+      status: 'running', 
+      message: 'Server is running',
       error: error.message 
     });
   }
@@ -150,15 +148,19 @@ app.get("/ping", (req, res) => {
   res.status(200).json({ status: "ok", timestamp: new Date().toISOString() });
 });
 
-// Database connection
+// Database connection - non-blocking, won't crash server if it fails
 let db;
+let dbConnected = false;
+
 async function connectDB() {
   try {
     // Validate required environment variables
     if (!process.env.DB_HOST || !process.env.DB_USER || !process.env.DB_PASSWORD || !process.env.DB_NAME) {
-      throw new Error("Missing required database environment variables (DB_HOST, DB_USER, DB_PASSWORD, DB_NAME)");
+      console.warn("⚠️ Missing database environment variables - some features may not work");
+      return;
     }
 
+    console.log("🔄 Connecting to database...");
     db = await mysql.createConnection({
       host: process.env.DB_HOST,
       port: process.env.DB_PORT || 3306,
@@ -167,12 +169,15 @@ async function connectDB() {
       database: process.env.DB_NAME,
       connectTimeout: 10000, // 10 seconds timeout
     });
+    dbConnected = true;
     console.log("✅ Database connected successfully");
     app.locals.db = db; // make DB available in routes
   } catch (err) {
     console.error("❌ Database connection failed:", err.message);
     console.error("❌ Database error details:", err);
-    process.exit(1); // stop the app if DB fails
+    dbConnected = false;
+    // Don't exit - server can still run, routes will handle DB errors
+    console.warn("⚠️ Server will continue without database connection");
   }
 }
 
@@ -235,11 +240,18 @@ async function loadRoutes() {
   }
 }
 
-// Start server only after DB connection and routes loaded
+// Start server immediately, connect to DB in background
 async function startServer() {
   try {
-    await connectDB();
+    // Load routes first (they don't need DB connection immediately)
     await loadRoutes();
+    
+    // Start server FIRST so Railway can connect immediately
+    // Then connect to DB in background (non-blocking)
+    connectDB().catch(err => {
+      console.error('❌ Background database connection failed:', err);
+      // Don't exit - server can still serve requests, DB will retry
+    });
 
     // Railway provides PORT environment variable - MUST use it
     // In production, PORT is required. Only fallback to 3000 for local development.

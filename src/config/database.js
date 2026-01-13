@@ -16,16 +16,20 @@ const pool = mysql.createPool({
   port: process.env.DB_PORT || 3306
 });
 
-// Test database connection
-pool.getConnection((err, connection) => {
-  if (err) {
-    console.error('Database connection failed:', err.message);
-    console.error('Error code:', err.code);
-    console.error('Error number:', err.errno);
-  } else {
-    console.log('Database connected successfully');
-    connection.release();
-  }
-});
+// Test database connection (non-blocking, in background)
+// Don't block module loading - connection will happen when needed
+setTimeout(() => {
+  pool.getConnection((err, connection) => {
+    if (err) {
+      console.error('Database pool connection test failed:', err.message);
+      console.error('Error code:', err.code);
+      console.error('Error number:', err.errno);
+      // Don't exit - pool will retry when needed
+    } else {
+      console.log('Database pool connection test successful');
+      connection.release();
+    }
+  });
+}, 100); // Small delay to not block startup
 
 module.exports = pool.promise();
