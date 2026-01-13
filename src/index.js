@@ -42,10 +42,15 @@ app.use((req, res, next) => {
 
 app.use(express.json());
 
-// Request logging
+// Request logging with error handling
 app.use((req, res, next) => {
-  console.log(`${req.method} ${req.path} - ${new Date().toISOString()}`);
-  next();
+  try {
+    console.log(`${req.method} ${req.path} - ${new Date().toISOString()}`);
+    next();
+  } catch (error) {
+    console.error('Error in request logging middleware:', error);
+    next();
+  }
 });
 
 // Serve uploads
@@ -53,49 +58,68 @@ app.use("/uploads", express.static(uploadsDir));
 
 // Health check endpoint
 app.get("/health", async (req, res) => {
-  const healthcheck = {
-    status: 'server is running',
-    timestamp: new Date().toISOString(),
-    uptime: process.uptime(),
-    database: 'unknown',
-    environment: process.env.NODE_ENV || 'development',
-    nodeVersion: process.version,
-    platform: process.platform,
-    memoryUsage: process.memoryUsage()
-  };
-
   try {
-    // Check database connection if available
-    if (db) {
-      const [rows] = await db.query('SELECT 1 as db_ok');
-      healthcheck.database = rows && rows[0] && rows[0].db_ok === 1 ? 'connected' : 'disconnected';
-    } else {
-      healthcheck.database = 'not connected';
+    console.log('Health check endpoint hit');
+    const healthcheck = {
+      status: 'server is running',
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime(),
+      database: 'unknown',
+      environment: process.env.NODE_ENV || 'development',
+      nodeVersion: process.version,
+      platform: process.platform,
+      memoryUsage: process.memoryUsage()
+    };
+
+    try {
+      // Check database connection if available
+      if (db) {
+        const [rows] = await db.query('SELECT 1 as db_ok');
+        healthcheck.database = rows && rows[0] && rows[0].db_ok === 1 ? 'connected' : 'disconnected';
+      } else {
+        healthcheck.database = 'not connected';
+      }
+    } catch (dbError) {
+      console.error('Database check error:', dbError);
+      healthcheck.database = 'connection failed';
+      healthcheck.dbError = dbError.message;
     }
 
     res.status(200).json(healthcheck);
   } catch (error) {
-    healthcheck.status = 'error';
-    healthcheck.error = error.message;
-    healthcheck.database = 'connection failed';
-    res.status(503).json(healthcheck);
+    console.error('Error in health check:', error);
+    res.status(500).json({ 
+      status: 'error', 
+      message: 'Health check failed',
+      error: error.message 
+    });
   }
 });
 
 // Root endpoint
 app.get("/", (req, res) => {
-  res.json({
-    status: 'success',
-    message: 'HomeAI API is running',
-    version: '1.0.0',
-    timestamp: new Date().toISOString(),
-    endpoints: {
-      health: '/health',
-      apiDocs: '/api-docs',
-      users: '/api/users',
-      images: '/api/images'
-    }
-  });
+  try {
+    console.log('Root endpoint hit');
+    res.json({
+      status: 'success',
+      message: 'HomeAI API is running',
+      version: '1.0.0',
+      timestamp: new Date().toISOString(),
+      endpoints: {
+        health: '/health',
+        apiDocs: '/api-docs',
+        users: '/api/users',
+        images: '/api/images'
+      }
+    });
+  } catch (error) {
+    console.error('Error in root endpoint:', error);
+    res.status(500).json({ 
+      status: 'error', 
+      message: 'Internal server error',
+      error: error.message 
+    });
+  }
 });
 
 // Database connection
@@ -135,19 +159,30 @@ async function loadRoutes() {
     app.use("/api/images", imageRoutes);
     console.log("Image routes loaded successfully");
 
+    // Simple test endpoint
+    app.get("/test", (req, res) => {
+      res.json({ status: "ok", message: "Test endpoint working" });
+    });
+
     // Error handler - MUST be registered AFTER routes
     app.use((err, req, res, next) => {
-      console.error("🔥 Error handler triggered:", err.stack);
-      res.status(500).json({ success: false, message: err.message || "Something went wrong!" });
+      console.error("🔥 Error handler triggered:", err);
+      console.error("🔥 Error stack:", err.stack);
+      if (!res.headersSent) {
+        res.status(500).json({ success: false, message: err.message || "Something went wrong!" });
+      }
     });
 
     // 404 handler - MUST be registered LAST, after all routes
     app.use((req, res) => {
       console.log(`404 - Route not found: ${req.method} ${req.path}`);
-      res.status(404).json({ message: "Route not found" });
+      if (!res.headersSent) {
+        res.status(404).json({ message: "Route not found" });
+      }
     });
   } catch (err) {
     console.error("Error loading routes:", err);
+    console.error("Error stack:", err.stack);
     throw err; // Re-throw to be caught by startServer
   }
 }
@@ -172,6 +207,14 @@ async function startServer() {
       console.log(`📊 Health check: http://localhost:${PORT}/health`);
       console.log(`🔄 API Base URL: http://localhost:${PORT}/api`);
       console.log(`📡 Server ready to accept connections`);
+      console.log(`✅ Server listening and ready for requests`);
+      
+      // Verify server is actually listening
+      if (server.listening) {
+        console.log(`✅ Server confirmed listening on port ${PORT}`);
+      } else {
+        console.error(`❌ Server not listening!`);
+      }
     });
 
     // Handle server errors
