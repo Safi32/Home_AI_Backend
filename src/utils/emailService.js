@@ -37,7 +37,7 @@ const sendOtpEmail = async (to, otp, expiryMinutes) => {
   }
 
   // Additional validation for proper email format
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
   if (!emailRegex.test(fromAddress)) {
     console.error('❌ Invalid email format:', fromAddress);
     console.error('❌ Expected format: name@domain.com');
