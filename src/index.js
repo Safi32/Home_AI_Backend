@@ -11,13 +11,15 @@ dotenv.config();
 // Global error handlers to prevent crashes
 process.on('unhandledRejection', (reason, promise) => {
   console.error('❌ Unhandled Rejection at:', promise, 'reason:', reason);
-  // Don't exit in production, log and continue
+  console.error('Stack:', reason?.stack || 'No stack trace');
+  // Don't exit - log and continue to keep server running
 });
 
 process.on('uncaughtException', (error) => {
   console.error('❌ Uncaught Exception:', error);
-  // In production, we might want to exit, but for now just log
   console.error('Stack:', error.stack);
+  // Log but don't exit immediately - give server a chance to handle it
+  // In production, we might want to exit after logging
 });
 
 // Ensure uploads directory exists
@@ -115,7 +117,7 @@ app.get("/health", async (req, res) => {
   }
 });
 
-// Root endpoint
+// Root endpoint - registered early to ensure it's always available
 app.get("/", (req, res) => {
   try {
     console.log('Root endpoint hit');
@@ -133,12 +135,19 @@ app.get("/", (req, res) => {
     });
   } catch (error) {
     console.error('Error in root endpoint:', error);
-    res.status(500).json({ 
-      status: 'error', 
-      message: 'Internal server error',
-      error: error.message 
-    });
+    if (!res.headersSent) {
+      res.status(500).json({ 
+        status: 'error', 
+        message: 'Internal server error',
+        error: error.message 
+      });
+    }
   }
+});
+
+// Simple ping endpoint for Railway health checks
+app.get("/ping", (req, res) => {
+  res.status(200).json({ status: "ok", timestamp: new Date().toISOString() });
 });
 
 // Database connection
@@ -171,12 +180,23 @@ async function connectDB() {
 async function loadRoutes() {
   try {
     console.log("Loading user routes...");
-    app.use("/api/users", userRoutes);
-    console.log("User routes loaded successfully");
+    // Wrap route loading in try-catch to prevent crashes
+    try {
+      app.use("/api/users", userRoutes);
+      console.log("User routes loaded successfully");
+    } catch (userRouteError) {
+      console.error("Error loading user routes:", userRouteError);
+      throw userRouteError;
+    }
 
     console.log("Loading image routes...");
-    app.use("/api/images", imageRoutes);
-    console.log("Image routes loaded successfully");
+    try {
+      app.use("/api/images", imageRoutes);
+      console.log("Image routes loaded successfully");
+    } catch (imageRouteError) {
+      console.error("Error loading image routes:", imageRouteError);
+      throw imageRouteError;
+    }
 
     // Simple test endpoint
     app.get("/test", (req, res) => {
@@ -228,7 +248,10 @@ async function startServer() {
     console.log(`🚀 Starting server on port ${PORT}...`);
     console.log(`📋 Environment: ${process.env.NODE_ENV || 'development'}`);
 
+    // Create server and start listening
+    // Railway requires binding to 0.0.0.0 to accept external connections
     const server = app.listen(PORT, "0.0.0.0", () => {
+      const address = server.address();
       console.log(`✅ Server is running on port ${PORT}`);
       console.log(`🌐 Local URL: http://localhost:${PORT}`);
       console.log(`🌍 Network URL: http://0.0.0.0:${PORT}`);
@@ -240,9 +263,23 @@ async function startServer() {
       // Verify server is actually listening
       if (server.listening) {
         console.log(`✅ Server confirmed listening on port ${PORT}`);
+        console.log(`✅ Server address:`, address);
       } else {
         console.error(`❌ Server not listening!`);
       }
+      
+      // Keep process alive
+      console.log(`✅ Process PID: ${process.pid}`);
+      console.log(`✅ Server startup complete - ready to handle requests`);
+    });
+
+    // Ensure server stays alive
+    server.keepAliveTimeout = 65000; // 65 seconds
+    server.headersTimeout = 66000; // 66 seconds
+    
+    // Log when server closes
+    server.on('close', () => {
+      console.log('⚠️ Server closed');
     });
 
     // Handle server errors
@@ -283,4 +320,19 @@ async function startServer() {
   }
 }
 
-startServer();
+// Start server and handle any startup errors
+startServer().catch((error) => {
+  console.error('❌ Fatal error starting server:', error);
+  console.error('Stack:', error.stack);
+  process.exit(1);
+});
+
+// Keep process alive
+process.on('beforeExit', (code) => {
+  console.log(`⚠️ Process about to exit with code: ${code}`);
+});
+
+// Prevent accidental exits
+process.on('exit', (code) => {
+  console.log(`⚠️ Process exiting with code: ${code}`);
+});
