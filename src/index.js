@@ -244,33 +244,45 @@ async function startServer() {
     // Railway provides PORT environment variable - use it directly
     // Fallback to 3000 for local development
     const PORT = process.env.PORT || 3000;
-
-    console.log(`🚀 Starting server on port ${PORT}...`);
+    
+    // Validate PORT
+    if (!PORT || isNaN(PORT)) {
+      throw new Error(`Invalid PORT: ${PORT}. PORT must be a number.`);
+    }
+    
+    const portNumber = parseInt(PORT, 10);
+    console.log(`🚀 Starting server on port ${portNumber}...`);
     console.log(`📋 Environment: ${process.env.NODE_ENV || 'development'}`);
+    console.log(`📋 PORT from env: ${process.env.PORT}`);
+    console.log(`📋 Using port: ${portNumber}`);
 
     // Create server and start listening
     // Railway requires binding to 0.0.0.0 to accept external connections
-    const server = app.listen(PORT, "0.0.0.0", () => {
+    const server = app.listen(portNumber, "0.0.0.0", () => {
       const address = server.address();
-      console.log(`✅ Server is running on port ${PORT}`);
-      console.log(`🌐 Local URL: http://localhost:${PORT}`);
-      console.log(`🌍 Network URL: http://0.0.0.0:${PORT}`);
-      console.log(`📊 Health check: http://localhost:${PORT}/health`);
-      console.log(`🔄 API Base URL: http://localhost:${PORT}/api`);
+      console.log(`✅ Server is running on port ${portNumber}`);
+      console.log(`🌐 Local URL: http://localhost:${portNumber}`);
+      console.log(`🌍 Network URL: http://0.0.0.0:${portNumber}`);
+      console.log(`📊 Health check: http://localhost:${portNumber}/health`);
+      console.log(`🔄 API Base URL: http://localhost:${portNumber}/api`);
       console.log(`📡 Server ready to accept connections`);
       console.log(`✅ Server listening and ready for requests`);
       
       // Verify server is actually listening
       if (server.listening) {
-        console.log(`✅ Server confirmed listening on port ${PORT}`);
-        console.log(`✅ Server address:`, address);
+        console.log(`✅ Server confirmed listening on port ${portNumber}`);
+        console.log(`✅ Server address:`, JSON.stringify(address));
+        console.log(`✅ Server family: ${address?.family || 'unknown'}`);
+        console.log(`✅ Server port: ${address?.port || 'unknown'}`);
       } else {
         console.error(`❌ Server not listening!`);
+        process.exit(1);
       }
       
       // Keep process alive
       console.log(`✅ Process PID: ${process.pid}`);
       console.log(`✅ Server startup complete - ready to handle requests`);
+      console.log(`✅ Server will remain running - do not exit`);
     });
 
     // Ensure server stays alive
@@ -284,12 +296,16 @@ async function startServer() {
 
     // Handle server errors
     server.on('error', (error) => {
+      console.error('❌ Server error event triggered:', error);
       if (error.code === 'EADDRINUSE') {
-        console.error(`❌ Port ${PORT} is already in use`);
+        console.error(`❌ Port ${portNumber} is already in use`);
       } else {
-        console.error('❌ Server error:', error);
+        console.error('❌ Server error code:', error.code);
+        console.error('❌ Server error message:', error.message);
+        console.error('❌ Server error stack:', error.stack);
       }
-      process.exit(1);
+      // Don't exit immediately - log and let Railway handle it
+      console.error('❌ Server error - but keeping process alive for debugging');
     });
 
     // Graceful shutdown
