@@ -21,8 +21,6 @@ const poolConfig = {
   // Add connection pooling settings for production
   connectionLimit: 10,
   acquireTimeout: 60000,
-  timeout: 60000,
-  reconnect: true,
   // Enable SSL for Railway (required for production)
   ssl: isRailway ? {
     rejectUnauthorized: false
