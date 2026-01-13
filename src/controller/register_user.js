@@ -48,25 +48,24 @@ const registerUser = async (req, res) => {
     });
 
     console.log('Sending OTP email...');
-    const emailSent = await sendOtpEmail(email, otp, OTP_EXPIRY_MINUTES);
-
-    console.log('Registration successful');
-    const response = {
-      success: true,
-      message: emailSent
-        ? "Registration successful. OTP sent to your email for verification."
-        : "Registration successful. Email service not configured. See logs for OTP.",
-      email: email
-    };
-
-    // Include OTP in response if email failed (for development/testing)
-    if (!emailSent || !process.env.SMTP_USER || !process.env.SMTP_PASS) {
-      response.otp = otp;
-      response.otpExpiresIn = `${OTP_EXPIRY_MINUTES} minutes`;
-      response.note = "Email service not configured. Use this OTP for verification.";
+    try {
+      await sendOtpEmail(email, otp, OTP_EXPIRY_MINUTES);
+      console.log('✅ Email sent successfully');
+    } catch (emailError) {
+      console.error('❌ Email sending failed:', emailError.message);
+      // Don't include OTP in response - return proper error
+      return res.status(503).json({
+        success: false,
+        message: "Registration successful but email service is currently unavailable. Please try again later.",
+        error: "Email service temporarily unavailable"
+      });
     }
 
-    return res.status(201).json(response);
+    console.log('Registration successful');
+    return res.status(201).json({
+      success: true,
+      message: "Registration successful. OTP sent to your email for verification."
+    });
 
   } catch (err) {
     console.error("Error in registerUser:", err);

@@ -1,17 +1,18 @@
 const nodemailer = require("nodemailer");
 
+// Railway-compatible SMTP configuration
 const transporter = nodemailer.createTransport({
-  port: 2525,
-  service: "gmail",
+  service: process.env.SMTP_SERVICE || "gmail",
   auth: {
     user: process.env.SMTP_USER || process.env.EMAIL_USER,
     pass: process.env.SMTP_PASS || process.env.EMAIL_PASS,
   },
+  pool: true, // Use connection pooling
+  maxConnections: 1,
+  maxMessages: 5,
+  rateDelta: 1000, // Rate limiting
+  rateLimit: 5
 });
-
-const fromAddress = `${process.env.SMTP_FROM_NAME || "HomeAI"} <${
-  process.env.SMTP_USER || process.env.EMAIL_USER
-}>`;
 
 /**
  * Sends an OTP email to the specified email address
@@ -20,13 +21,6 @@ const fromAddress = `${process.env.SMTP_FROM_NAME || "HomeAI"} <${
  * @param {number} expiryMinutes - Number of minutes until the OTP expires
  */
 const sendOtpEmail = async (to, otp, expiryMinutes) => {
-  // Check if email configuration is available
-  if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
-    console.warn('⚠️ Email credentials not configured. Skipping email sending.');
-    console.log(`🔢 OTP for ${to}: ${otp} (expires in ${expiryMinutes} minutes)`);
-    return true; // Continue without email
-  }
-
   const mailOptions = {
     from: fromAddress,
     to,
@@ -45,13 +39,11 @@ const sendOtpEmail = async (to, otp, expiryMinutes) => {
 
   try {
     await transporter.sendMail(mailOptions);
-    console.log(`✅ OTP email sent to ${to}`);
+    console.log(`OTP email sent to ${to}`);
     return true;
   } catch (error) {
-    console.error('❌ Error sending OTP email:', error);
-    console.log(`🔢 OTP for ${to}: ${otp} (expires in ${expiryMinutes} minutes)`);
-    console.warn('⚠️ Email failed but continuing with registration...');
-    return true; // Continue even if email fails
+    console.error('Error sending OTP email:', error);
+    throw new Error('Failed to send OTP email');
   }
 };
 

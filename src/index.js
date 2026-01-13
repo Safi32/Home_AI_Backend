@@ -144,8 +144,6 @@ app.get("/", (req, res) => {
       timestamp: new Date().toISOString(),
       endpoints: {
         health: '/health',
-        test: '/test',
-        debugRoutes: '/debug-routes',
         apiDocs: '/api-docs',
         users: '/api/users',
         images: '/api/images'
@@ -204,82 +202,28 @@ async function connectDB() {
 // Load routes
 async function loadRoutes() {
   try {
-    console.log("🔄 Starting route loading...");
-    console.log("📋 Available route modules:", {
-      userRoutes: !!userRoutes,
-      imageRoutes: !!imageRoutes
-    });
-
     console.log("Loading user routes...");
     // Wrap route loading in try-catch to prevent crashes
     try {
-      console.log("📦 userRoutes type:", typeof userRoutes);
-      console.log("📦 userRoutes:", userRoutes);
       app.use("/api/users", userRoutes);
-      console.log("✅ User routes loaded successfully at /api/users");
+      console.log("User routes loaded successfully");
     } catch (userRouteError) {
-      console.error("❌ Error loading user routes:", userRouteError);
-      console.error("❌ User route error stack:", userRouteError.stack);
+      console.error("Error loading user routes:", userRouteError);
       throw userRouteError;
     }
 
     console.log("Loading image routes...");
     try {
-      console.log("📦 imageRoutes type:", typeof imageRoutes);
-      console.log("📦 imageRoutes:", imageRoutes);
       app.use("/api/images", imageRoutes);
-      console.log("✅ Image routes loaded successfully at /api/images");
+      console.log("Image routes loaded successfully");
     } catch (imageRouteError) {
-      console.error("❌ Error loading image routes:", imageRouteError);
-      console.error("❌ Image route error stack:", imageRouteError.stack);
+      console.error("Error loading image routes:", imageRouteError);
       throw imageRouteError;
     }
 
     // Simple test endpoint
     app.get("/test", (req, res) => {
       res.json({ status: "ok", message: "Test endpoint working" });
-    });
-
-    // Debug routes endpoint
-    app.get("/debug-routes", (req, res) => {
-      try {
-        const routes = [];
-        app._router.stack.forEach((middleware) => {
-          if (middleware.route) {
-            // Routes registered directly on the app
-            routes.push({
-              path: middleware.route.path,
-              methods: Object.keys(middleware.route.methods),
-              stack: middleware.route.stack.length
-            });
-          } else if (middleware.name === 'router') {
-            // Routes registered via router
-            middleware.handle.stack.forEach((handler) => {
-              if (handler.route) {
-                routes.push({
-                  path: handler.route.path,
-                  methods: Object.keys(handler.route.methods),
-                  stack: handler.route.stack.length
-                });
-              }
-            });
-          }
-        });
-
-        res.json({
-          status: 'debug',
-          message: 'Available routes',
-          totalRoutes: routes.length,
-          routes: routes.sort((a, b) => a.path.localeCompare(b.path)),
-          timestamp: new Date().toISOString()
-        });
-      } catch (error) {
-        res.status(500).json({
-          status: 'error',
-          message: 'Failed to get routes',
-          error: error.message
-        });
-      }
     });
 
     // Error handler - MUST be registered AFTER routes (this catches route errors)
