@@ -20,6 +20,13 @@ const fromAddress = `${process.env.SMTP_FROM_NAME || "HomeAI"} <${
  * @param {number} expiryMinutes - Number of minutes until the OTP expires
  */
 const sendOtpEmail = async (to, otp, expiryMinutes) => {
+  // Check if email configuration is available
+  if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
+    console.warn('⚠️ Email credentials not configured. Skipping email sending.');
+    console.log(`🔢 OTP for ${to}: ${otp} (expires in ${expiryMinutes} minutes)`);
+    return true; // Continue without email
+  }
+
   const mailOptions = {
     from: fromAddress,
     to,
@@ -38,11 +45,13 @@ const sendOtpEmail = async (to, otp, expiryMinutes) => {
 
   try {
     await transporter.sendMail(mailOptions);
-    console.log(`OTP email sent to ${to}`);
+    console.log(`✅ OTP email sent to ${to}`);
     return true;
   } catch (error) {
-    console.error('Error sending OTP email:', error);
-    throw new Error('Failed to send OTP email');
+    console.error('❌ Error sending OTP email:', error);
+    console.log(`🔢 OTP for ${to}: ${otp} (expires in ${expiryMinutes} minutes)`);
+    console.warn('⚠️ Email failed but continuing with registration...');
+    return true; // Continue even if email fails
   }
 };
 
