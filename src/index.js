@@ -16,6 +16,18 @@ if (!fs.existsSync(uploadsDir)) {
 
 // Create Express app
 const app = express();
+
+// CORS middleware for Railway deployment
+app.use((req, res, next) => {
+  res.header("Access-Control-Allow-Origin", "*");
+  res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, PATCH, OPTIONS");
+  res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization");
+  if (req.method === "OPTIONS") {
+    return res.sendStatus(200);
+  }
+  next();
+});
+
 app.use(express.json());
 
 // Request logging
@@ -78,17 +90,24 @@ app.get("/", (req, res) => {
 let db;
 async function connectDB() {
   try {
+    // Validate required environment variables
+    if (!process.env.DB_HOST || !process.env.DB_USER || !process.env.DB_PASSWORD || !process.env.DB_NAME) {
+      throw new Error("Missing required database environment variables (DB_HOST, DB_USER, DB_PASSWORD, DB_NAME)");
+    }
+
     db = await mysql.createConnection({
       host: process.env.DB_HOST,
-      port: process.env.DB_PORT,
+      port: process.env.DB_PORT || 3306,
       user: process.env.DB_USER,
       password: process.env.DB_PASSWORD,
       database: process.env.DB_NAME,
+      connectTimeout: 10000, // 10 seconds timeout
     });
     console.log("✅ Database connected successfully");
     app.locals.db = db; // make DB available in routes
   } catch (err) {
     console.error("❌ Database connection failed:", err.message);
+    console.error("❌ Database error details:", err);
     process.exit(1); // stop the app if DB fails
   }
 }
@@ -120,74 +139,60 @@ app.use((req, res) => {
   res.status(404).json({ message: "Route not found" });
 });
 
-// Function to find an available port
-const getAvailablePort = async (startPort) => {
-  const net = require('net');
-  const server = net.createServer();
-
-  return new Promise((resolve, reject) => {
-    const tryPort = (port) => {
-      server.once('error', (err) => {
-        if (err.code === 'EADDRINUSE') {
-          console.log(`Port ${port} is in use, trying ${port + 1}...`);
-          tryPort(port + 1);
-        } else {
-          reject(err);
-        }
-      });
-
-      server.once('listening', () => {
-        server.close(() => resolve(port));
-      });
-
-      server.listen(port, '0.0.0.0');
-    };
-
-    tryPort(startPort);
-  });
-};
-
 // Start server only after DB connection and routes loaded
 async function startServer() {
   try {
     await connectDB();
     await loadRoutes();
 
-    // Start with a different default port to avoid conflicts
-    const DEFAULT_PORT = 3001; // Changed from 3000 to 3001
-    const PORT = process.env.PORT || await getAvailablePort(DEFAULT_PORT);
+    // Railway provides PORT environment variable - use it directly
+    // Fallback to 3000 for local development
+    const PORT = process.env.PORT || 3000;
+
+    console.log(`🚀 Starting server on port ${PORT}...`);
+    console.log(`📋 Environment: ${process.env.NODE_ENV || 'development'}`);
 
     const server = app.listen(PORT, "0.0.0.0", () => {
+      console.log(`✅ Server is running on port ${PORT}`);
+      console.log(`🌐 Local URL: http://localhost:${PORT}`);
+      console.log(`🌍 Network URL: http://0.0.0.0:${PORT}`);
+      console.log(`📊 Health check: http://localhost:${PORT}/health`);
+      console.log(`🔄 API Base URL: http://localhost:${PORT}/api`);
+      console.log(`📡 Server ready to accept connections`);
     });
 
     // Handle server errors
-    server.on('error', async (error) => {
+    server.on('error', (error) => {
       if (error.code === 'EADDRINUSE') {
-        console.log(`Port ${PORT} is in use, trying next available port...`);
-        // Try again with the next port
-        const newPort = await getAvailablePort(PORT + 1);
-        startServerWithPort(newPort);
+        console.error(`❌ Port ${PORT} is already in use`);
       } else {
         console.error('❌ Server error:', error);
-        process.exit(1);
       }
+      process.exit(1);
     });
 
-    // Helper function to start server with specific port
-    function startServerWithPort(port) {
-      const newServer = app.listen(port, "0.0.0.0", () => {
-        console.log(`✅ Server is running on port ${port}`);
-        console.log(`🌐 Local URL: http://localhost:${port}`);
-        console.log(`🌍 Network URL: http://0.0.0.0:${port}`);
-        console.log(`📊 Health check: http://localhost:${port}/health`);
-        console.log(`🔄 API Base URL: http://localhost:${port}/api`);
+    // Graceful shutdown
+    process.on('SIGTERM', () => {
+      console.log('SIGTERM signal received: closing HTTP server');
+      server.close(() => {
+        console.log('HTTP server closed');
+        if (db) {
+          db.end();
+        }
+        process.exit(0);
       });
+    });
 
-      newServer.on('error', (err) => {
-        console.error('❌ Failed to start server:', err);
-        process.exit(1);
+    process.on('SIGINT', () => {
+      console.log('SIGINT signal received: closing HTTP server');
+      server.close(() => {
+        console.log('HTTP server closed');
+        if (db) {
+          db.end();
+        }
+        process.exit(0);
       });
-    }
+    });
   } catch (error) {
     console.error('❌ Failed to start server:', error);
     process.exit(1);
