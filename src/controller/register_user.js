@@ -48,13 +48,28 @@ const registerUser = async (req, res) => {
     });
 
     console.log('Sending OTP email...');
-    await sendOtpEmail(email, otp, OTP_EXPIRY_MINUTES);
-
-    console.log('Registration successful');
-    return res.status(201).json({
-      success: true,
-      message: "Registration successful. OTP sent to your email for verification."
-    });
+    try {
+      await sendOtpEmail(email, otp, OTP_EXPIRY_MINUTES);
+      console.log('OTP email sent successfully');
+      
+      // Email sent successfully - return normal response
+      return res.status(201).json({
+        success: true,
+        message: "Registration successful. OTP sent to your email for verification."
+      });
+    } catch (emailError) {
+      console.error('Failed to send OTP email:', emailError.message);
+      console.log('Registration continuing with OTP in response for Railway compatibility');
+      
+      // Fallback: Return OTP in response for Railway deployment
+      return res.status(201).json({
+        success: true,
+        message: "Registration successful. OTP provided for Railway deployment.",
+        otp: otp,
+        emailSent: false,
+        note: "Email service unavailable - use provided OTP for verification"
+      });
+    }
 
   } catch (err) {
     console.error("Error in registerUser:", err);
