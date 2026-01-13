@@ -190,10 +190,9 @@ async function connectDB() {
       password: process.env.DB_PASSWORD,
       database: process.env.DB_NAME,
       connectTimeout: 10000,
-      // Enable SSL for Railway (required for production)
-      ssl: isRailway ? {
+      ssl: {
         rejectUnauthorized: false
-      } : false
+      }
     };
 
     console.log('Database connection config:', {

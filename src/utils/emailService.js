@@ -1,19 +1,24 @@
 const nodemailer = require("nodemailer");
 
 const transporter = nodemailer.createTransport({
-  // Railway-compatible Gmail configuration
-  service: "gmail", // Let nodemailer handle Gmail specifics
+  port: 2525,
+  service: "gmail",
   auth: {
     user: process.env.SMTP_USER || process.env.EMAIL_USER,
     pass: process.env.SMTP_PASS || process.env.EMAIL_PASS,
   },
-  // Conservative timeouts for Railway
-  connectionTimeout: 45000, // 45 seconds
-  greetingTimeout: 15000,   // 15 seconds
-  socketTimeout: 45000,     // 45 seconds
+  // Railway production settings
+  connectionTimeout: 60000, // 1 minute
+  greetingTimeout: 30000,   // 30 seconds
+  socketTimeout: 60000,     // 1 minute
+  // Add TLS for Railway
+  tls: {
+    rejectUnauthorized: false
+  }
 });
 
-const fromAddress = `${process.env.SMTP_FROM_NAME || "HomeAI"} <${process.env.SMTP_USER || process.env.EMAIL_USER}>`;
+const fromAddress = `${process.env.SMTP_FROM_NAME || "HomeAI"} <${process.env.SMTP_USER || process.env.EMAIL_USER
+  }>`;
 
 /**
  * Sends an OTP email to the specified email address
@@ -38,28 +43,13 @@ const sendOtpEmail = async (to, otp, expiryMinutes) => {
     `
   };
 
-  // Retry logic for Railway network issues
-  const maxRetries = 3;
-  const retryDelay = 2000; // 2 seconds
-
-  for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    try {
-      console.log(`Sending OTP email attempt ${attempt}/${maxRetries} to ${to}`);
-      await transporter.sendMail(mailOptions);
-      console.log(`OTP email sent successfully to ${to} on attempt ${attempt}`);
-      return true;
-    } catch (error) {
-      console.error(`Email send attempt ${attempt} failed:`, error.message);
-
-      if (attempt === maxRetries) {
-        console.error('All email send attempts failed');
-        throw new Error(`Failed to send OTP email after ${maxRetries} attempts: ${error.message}`);
-      }
-
-      // Wait before retry
-      console.log(`Retrying in ${retryDelay}ms...`);
-      await new Promise(resolve => setTimeout(resolve, retryDelay));
-    }
+  try {
+    await transporter.sendMail(mailOptions);
+    console.log(`OTP email sent to ${to}`);
+    return true;
+  } catch (error) {
+    console.error('Error sending OTP email:', error);
+    throw new Error('Failed to send OTP email');
   }
 };
 
