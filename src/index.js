@@ -241,20 +241,40 @@ async function startServer() {
     await connectDB();
     await loadRoutes();
 
-    // Railway provides PORT environment variable - use it directly
-    // Fallback to 3000 for local development
-    const PORT = process.env.PORT || 3000;
+    // Railway provides PORT environment variable - MUST use it
+    // In production, PORT is required. Only fallback to 3000 for local development.
+    const isProduction = process.env.NODE_ENV === 'production' || process.env.RAILWAY_ENVIRONMENT;
     
-    // Validate PORT
-    if (!PORT || isNaN(PORT)) {
-      throw new Error(`Invalid PORT: ${PORT}. PORT must be a number.`);
+    // Get PORT from environment - Railway always provides this
+    const PORT = process.env.PORT;
+    
+    if (!PORT) {
+      if (isProduction) {
+        throw new Error('PORT environment variable is required in production. Railway should provide this automatically.');
+      }
+      console.warn('⚠️ PORT not set, using default 3000 for local development');
     }
     
-    const portNumber = parseInt(PORT, 10);
-    console.log(`🚀 Starting server on port ${portNumber}...`);
+    // Use PORT from Railway, or fallback to 3000 only for local dev
+    const portToUse = PORT || '3000';
+    
+    // Validate PORT is a number
+    const portNumber = parseInt(portToUse, 10);
+    if (isNaN(portNumber) || portNumber <= 0 || portNumber > 65535) {
+      throw new Error(`Invalid PORT: ${portToUse}. PORT must be a number between 1 and 65535.`);
+    }
+    
+    console.log(`🚀 Starting server...`);
     console.log(`📋 Environment: ${process.env.NODE_ENV || 'development'}`);
-    console.log(`📋 PORT from env: ${process.env.PORT}`);
+    console.log(`📋 Railway Environment: ${process.env.RAILWAY_ENVIRONMENT || 'not set'}`);
+    console.log(`📋 PORT from Railway env: ${process.env.PORT || 'NOT SET (using fallback)'}`);
     console.log(`📋 Using port: ${portNumber}`);
+    console.log(`✅ Will listen on Railway's provided port: ${portNumber}`);
+    
+    // Warn if not using Railway's PORT in production
+    if (isProduction && !process.env.PORT) {
+      console.error('❌ WARNING: Running in production but PORT env var not set!');
+    }
 
     // Create server and start listening
     // Railway requires binding to 0.0.0.0 to accept external connections
