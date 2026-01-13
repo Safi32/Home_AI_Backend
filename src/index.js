@@ -8,6 +8,18 @@ const imageRoutes = require("./router/imageRoutes");
 
 dotenv.config();
 
+// Global error handlers to prevent crashes
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('❌ Unhandled Rejection at:', promise, 'reason:', reason);
+  // Don't exit in production, log and continue
+});
+
+process.on('uncaughtException', (error) => {
+  console.error('❌ Uncaught Exception:', error);
+  // In production, we might want to exit, but for now just log
+  console.error('Stack:', error.stack);
+});
+
 // Ensure uploads directory exists
 const uploadsDir = path.join(__dirname, "..", "uploads");
 if (!fs.existsSync(uploadsDir)) {
@@ -122,22 +134,23 @@ async function loadRoutes() {
     console.log("Loading image routes...");
     app.use("/api/images", imageRoutes);
     console.log("Image routes loaded successfully");
+
+    // Error handler - MUST be registered AFTER routes
+    app.use((err, req, res, next) => {
+      console.error("🔥 Error handler triggered:", err.stack);
+      res.status(500).json({ success: false, message: err.message || "Something went wrong!" });
+    });
+
+    // 404 handler - MUST be registered LAST, after all routes
+    app.use((req, res) => {
+      console.log(`404 - Route not found: ${req.method} ${req.path}`);
+      res.status(404).json({ message: "Route not found" });
+    });
   } catch (err) {
     console.error("Error loading routes:", err);
+    throw err; // Re-throw to be caught by startServer
   }
 }
-
-// Error handler
-app.use((err, req, res, next) => {
-  console.error("🔥 Error handler triggered:", err.stack);
-  res.status(500).json({ success: false, message: err.message || "Something went wrong!" });
-});
-
-// 404 handler
-app.use((req, res) => {
-  console.log(`404 - Route not found: ${req.method} ${req.path}`);
-  res.status(404).json({ message: "Route not found" });
-});
 
 // Start server only after DB connection and routes loaded
 async function startServer() {
