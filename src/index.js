@@ -179,14 +179,30 @@ async function connectDB() {
     }
 
     console.log("🔄 Connecting to database...");
-    db = await mysql.createConnection({
+
+    // Railway-specific database configuration
+    const isRailway = process.env.RAILWAY_ENVIRONMENT || process.env.NODE_ENV === 'production';
+
+    const dbConfig = {
       host: process.env.DB_HOST,
       port: process.env.DB_PORT || 3306,
       user: process.env.DB_USER,
       password: process.env.DB_PASSWORD,
       database: process.env.DB_NAME,
-      connectTimeout: 10000, // 10 seconds timeout
+      connectTimeout: 10000,
+      // Enable SSL for Railway (required for production)
+      ssl: isRailway ? {
+        rejectUnauthorized: false
+      } : false
+    };
+
+    console.log('Database connection config:', {
+      ...dbConfig,
+      password: dbConfig.password ? 'SET' : 'MISSING',
+      ssl: dbConfig.ssl
     });
+
+    db = await mysql.createConnection(dbConfig);
     dbConnected = true;
     console.log("✅ Database connected successfully");
     app.locals.db = db; // make DB available in routes

@@ -1,16 +1,28 @@
 const nodemailer = require("nodemailer");
 
+// Railway-specific email configuration
+const isRailway = process.env.RAILWAY_ENVIRONMENT || process.env.NODE_ENV === 'production';
+
 const transporter = nodemailer.createTransport({
-  port: 2525,
-  service: "gmail",
+  host: process.env.SMTP_HOST || 'smtp.gmail.com',
+  port: process.env.SMTP_PORT || 587,
+  secure: false, // true for 465, false for other ports
+  service: process.env.SMTP_SERVICE || "gmail",
   auth: {
     user: process.env.SMTP_USER || process.env.EMAIL_USER,
     pass: process.env.SMTP_PASS || process.env.EMAIL_PASS,
   },
+  // Add connection settings for Railway
+  pool: true,
+  maxConnections: 5,
+  maxMessages: 100,
+  // Add timeout settings
+  connectionTimeout: 60000,
+  greetingTimeout: 30000,
+  socketTimeout: 60000,
 });
 
-const fromAddress = `${process.env.SMTP_FROM_NAME || "HomeAI"} <${process.env.SMTP_USER || process.env.EMAIL_USER
-  }>`;
+const fromAddress = `${process.env.SMTP_FROM_NAME || "HomeAI"} <${process.env.SMTP_USER || process.env.EMAIL_USER}>`;
 
 /**
  * Sends an OTP email to the specified email address

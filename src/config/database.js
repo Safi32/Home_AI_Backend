@@ -7,14 +7,35 @@ console.log('DB_USER:', process.env.DB_USER);
 console.log('DB_PASSWORD:', process.env.DB_PASSWORD ? 'SET' : 'MISSING');
 console.log('DB_NAME:', process.env.DB_NAME);
 console.log('DB_PORT:', process.env.DB_PORT);
+console.log('NODE_ENV:', process.env.NODE_ENV);
 
-const pool = mysql.createPool({
+// Railway-specific database configuration
+const isRailway = process.env.RAILWAY_ENVIRONMENT || process.env.NODE_ENV === 'production';
+
+const poolConfig = {
   host: process.env.DB_HOST,
   user: process.env.DB_USER,
   password: process.env.DB_PASSWORD,
   database: process.env.DB_NAME,
-  port: process.env.DB_PORT || 3306
+  port: process.env.DB_PORT || 3306,
+  // Add connection pooling settings for production
+  connectionLimit: 10,
+  acquireTimeout: 60000,
+  timeout: 60000,
+  reconnect: true,
+  // Enable SSL for Railway (required for production)
+  ssl: isRailway ? {
+    rejectUnauthorized: false
+  } : false
+};
+
+console.log('Database config:', {
+  ...poolConfig,
+  password: poolConfig.password ? 'SET' : 'MISSING',
+  ssl: poolConfig.ssl
 });
+
+const pool = mysql.createPool(poolConfig);
 
 // Test database connection (non-blocking, in background)
 // Don't block module loading - connection will happen when needed
