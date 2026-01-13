@@ -1,21 +1,19 @@
 const nodemailer = require("nodemailer");
 
 const transporter = nodemailer.createTransport({
-  port: 587,
-  host: "smtp.gmail.com",
-  secure: false, // or 'STARTTLS'
+  // Railway-compatible Gmail configuration
+  service: "gmail", // Let nodemailer handle Gmail specifics
   auth: {
     user: process.env.SMTP_USER || process.env.EMAIL_USER,
     pass: process.env.SMTP_PASS || process.env.EMAIL_PASS,
   },
-  // Add timeout settings to prevent connection timeout
-  connectionTimeout: 60000, // 1 minute
-  greetingTimeout: 30000,   // 30 seconds
-  socketTimeout: 60000,     // 1 minute
+  // Conservative timeouts for Railway
+  connectionTimeout: 45000, // 45 seconds
+  greetingTimeout: 15000,   // 15 seconds
+  socketTimeout: 45000,     // 45 seconds
 });
 
-const fromAddress = `${process.env.SMTP_FROM_NAME || "HomeAI"} <${process.env.SMTP_USER || process.env.EMAIL_USER
-  }>`;
+const fromAddress = `${process.env.SMTP_FROM_NAME || "HomeAI"} <${process.env.SMTP_USER || process.env.EMAIL_USER}>`;
 
 /**
  * Sends an OTP email to the specified email address

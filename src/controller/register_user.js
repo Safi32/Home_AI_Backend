@@ -49,6 +49,7 @@ const registerUser = async (req, res) => {
 
     console.log('Sending OTP email...');
     await sendOtpEmail(email, otp, OTP_EXPIRY_MINUTES);
+    console.log('OTP email sent successfully');
 
     console.log('Registration successful');
     return res.status(201).json({
