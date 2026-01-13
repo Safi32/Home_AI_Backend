@@ -332,19 +332,9 @@ async function startServer() {
       console.log(`🔄 API Base URL: http://localhost:${portNumber}/api`);
       console.log(`📡 Server ready to accept connections`);
       console.log(`✅ Server listening and ready for requests`);
-      
-      // Verify server is actually listening
-      if (server.listening) {
-        console.log(`✅ Server confirmed listening on port ${portNumber}`);
-        console.log(`✅ Server address:`, JSON.stringify(address));
-        console.log(`✅ Server family: ${address?.family || 'unknown'}`);
-        console.log(`✅ Server port: ${address?.port || 'unknown'}`);
-      } else {
-        console.error(`❌ Server not listening!`);
-        process.exit(1);
-      }
-      
-      // Keep process alive
+      console.log(`✅ Server address:`, JSON.stringify(address));
+      console.log(`✅ Server family: ${address?.family || 'unknown'}`);
+      console.log(`✅ Server port: ${address?.port || 'unknown'}`);
       console.log(`✅ Process PID: ${process.pid}`);
       console.log(`✅ Server startup complete - ready to handle requests`);
       console.log(`✅ Server will remain running - do not exit`);
