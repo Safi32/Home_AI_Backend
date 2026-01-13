@@ -40,6 +40,15 @@ app.use((req, res, next) => {
   next();
 });
 
+// Error handler for JSON parsing and other early middleware errors
+app.use((err, req, res, next) => {
+  if (err instanceof SyntaxError && err.status === 400 && 'body' in err) {
+    console.error('JSON parsing error:', err);
+    return res.status(400).json({ success: false, message: 'Invalid JSON' });
+  }
+  next(err);
+});
+
 app.use(express.json());
 
 // Request logging with error handling
@@ -72,10 +81,20 @@ app.get("/health", async (req, res) => {
     };
 
     try {
-      // Check database connection if available
+      // Check database connection if available (with timeout)
       if (db) {
-        const [rows] = await db.query('SELECT 1 as db_ok');
-        healthcheck.database = rows && rows[0] && rows[0].db_ok === 1 ? 'connected' : 'disconnected';
+        const dbCheckPromise = db.query('SELECT 1 as db_ok');
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Database check timeout')), 2000)
+        );
+        
+        try {
+          const [rows] = await Promise.race([dbCheckPromise, timeoutPromise]);
+          healthcheck.database = rows && rows[0] && rows[0].db_ok === 1 ? 'connected' : 'disconnected';
+        } catch (timeoutError) {
+          console.error('Database check timeout:', timeoutError);
+          healthcheck.database = 'timeout';
+        }
       } else {
         healthcheck.database = 'not connected';
       }
@@ -164,12 +183,21 @@ async function loadRoutes() {
       res.json({ status: "ok", message: "Test endpoint working" });
     });
 
-    // Error handler - MUST be registered AFTER routes
+    // Error handler - MUST be registered AFTER routes (this catches route errors)
     app.use((err, req, res, next) => {
       console.error("🔥 Error handler triggered:", err);
+      console.error("🔥 Error message:", err.message);
       console.error("🔥 Error stack:", err.stack);
       if (!res.headersSent) {
-        res.status(500).json({ success: false, message: err.message || "Something went wrong!" });
+        res.status(err.status || 500).json({ 
+          success: false, 
+          message: err.message || "Something went wrong!",
+          ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
+        });
+      } else {
+        // If headers already sent, just log and end
+        console.error("🔥 Headers already sent, cannot send error response");
+        res.end();
       }
     });
 
